@@ -52,7 +52,7 @@ let area (s : shape) : float =
   | Square s -> s *. s
   | Ellipse (r1, r2)-> pi *. r1 *. r2
   | RtTriangle (s1, s2) -> s1 *. s2 /. 2.
-  | Polygon ps -> poly_area ps
+  | Polygon ps -> poly_area ps (*cas inductif*) 
   ;;
 
 (*"arbre binaire" type de donnees inductifs*)
@@ -63,3 +63,14 @@ type tree =
   Leaf
   | Node of key * value * tree * tree
   ;;
+let arbre1 = Node(9,"a",Node (3,"b",Leaf , 
+                                    Node (7,"de",Leaf,Leaf)), 
+                        Node (12,"c",Leaf,Leaf));;
+
+let rec insert (t:tree) (k:key) (v:value) :tree = 
+  match t with 
+  | Leaf -> Node (k, v, Leaf, Leaf)
+  | Node (k', v', left, right) ->  (*cas inductif*)
+      if k < k' then Node (k', v', insert left k v, right)
+      else if k > k' then Node (k', v',left , insert right k v)
+      else Node (k', v', left, right)                      
