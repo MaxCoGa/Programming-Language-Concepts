@@ -1,137 +1,100 @@
-(* Object-Oriented Programming in OCaml (Real World OCaml Chapter 12):
-   Representing Grammars as Classes and Expressions as Objects *)
-
-(* We can represent expressions given by the grammar:
-
-   e ::= num | e + e
-
-   by using objects from a class called "expression".  We begin with
-   an abstract class (using the keyword "virtual" in OCaml) called
-   "expression".  Although this class has no instances, it lists the
-   operations common to all the different kinds of expressions.  These
-   operations include a predicate "is_atomic" indicating whether there
-   are subexpressions or not, operations to retrieve the left and
-   right subexpressions (if the expression is not atomic), and a
-   method computing the value of the expression.
+(*
+  Exceptions et Continuations
  *)
 
-class virtual expression = object
-  method virtual is_atomic : bool
-  method virtual left_sub : expression option
-  method virtual right_sub : expression option
-  method virtual value : int
-end
+(* QUESTION 1. Exceptions et récursion *)
+(* Considérez les types d’étapes d’exécution ci-dessous.  Vous les
+   utiliserez pour indiquer les étapes d'exécution du code
+   ci-dessous.
+   - appel de fonction (avec argument)
+   - retour de la fonction (avec valeur de retour)
+   - lever une exception
+   - gérer une exception
+   - dépiler un enregistrement d'activation d'un appel à une fonction
+     sans retourner contrôle à la fonction
 
-(* Because the grammar has two cases, we have two subclasses of
-   "expression", one for numbers, and one for sums.
- *)
+   La dernière étape doit être utilisée quand une fonction f appelle
+   une fonction g (qui pourrait être un appel récursif à f), et g lève
+   une exception, et f ne gère pas cette exception. Dans ce cas,
+   l'enregistrement d'activation de f est dépiler sans rendre le
+   contrôle à f.
 
-class number_exp (n:int) = object
-  inherit expression as super
-  val mutable number_val = n
-  method is_atomic = true
-  method left_sub = None
-  method right_sub = None
-  method value = number_val
-end               
+   Considérez la fonction OCaml f1 suivante qui utilise une exception
+   appelée Odd. *)
 
-class sum_exp (e1:expression) (e2:expression) = object
-  inherit expression as super
-  val mutable left_exp = e1
-  val mutable right_exp = e2
-  method is_atomic = false
-  method left_sub = Some left_exp
-  method right_sub = Some right_exp
-  method value = left_exp#value + right_exp#value
-end
+exception Odd
+let rec f1 (x:int) =
+  match x with
+  | 0 -> 1
+  | 1 -> raise Odd
+  | 3 -> f1 (3-2)
+  | _ -> try f1 (x-2) with | Odd -> (-x)
 
-(* QUESTION 1. Product Class and Method Calls *)
-(* 1(a). Extend this class hierarchy by writing a "prod_exp" class to
-   represent product expressions of the form:
+(* Indiquez la séquence des étapes pour l’appel de fonction (f1 11). Le
+   premier est "appel (f1 11)" et le second est "appel (f1 9)".
+   Donnez la liste du reste des étapes à partir d'ici. *)
 
-   e ::= ... | e * e
- *)
 
-(* 1(b). Create objects representing the following expressions:
-   - An expression "a" representing the number 3
-   - An expression "b" representing the number 0
-   - An expression "c" representing the number 5
-   - An expression "d" representing the sum of "a" and "b"
-   - An expression "e" representing the product of "d" and "c"
-   Then send the message "value" to "e".
-   Note that "e" represents the expression (3+0)*5.
+(* QUESTION 2. Exceptions et gestion de la mémoire *)
+(* Les deux versions suivantes de la fonction "closest" prennent un
+   entier x et un arbre t comme arguments et renvoient la valeur de la
+   feuille qui est le plus proche de x en valeur absolue. La première
+   fonction est une fonction récursive simple et la seconde utilise
+   des exceptions. Les deux sont appliquées au même exemple.  Cet
+   exemple est un arbre simple.
 
-   To answer 1(b), uncomment this code and fill it in:
-   let a = ...
-   let b = ...
-   ...
- *)
-                                              
-(* QUESTION 2. Unary Expressions *)
-(* Extend the class hierarchy further by writing a "square_exp".
-   The expression below written e^2 means "e squared":
+   Dessinez les piles d'activation pour l'exécution de chacun de ces
+   programmes. Dans vos enregistrements d’activation, incluez les
+   liens d’accès, les paramètres, les variables locales (y compris les
+   gestionnaires d'exceptions) et les adresses de valeurs de
+   retour. Également incluez les résultats intermédiaires pour (abs
+   (x-lf)) et (abs (x-rt)) dans les appels à la fonction "closest".
 
-   e ::= ... | e^2
+   Si des enregistrements d'activation doivent être dépilés de la
+   pile, ne les effacez pas.  Au lieu de les effacer, marquez-les
+   comme dépilés et continuez en dessous.
 
-   Changes will be required to the "expression" interface, so you will
-   need to reimplement all the classes from above with these changes.
-   Try to make as few changes as possible to the program. *)
+   Expliquez pourquoi la deuxième fonction est parfois plus efficace
+   que le première fonction. *)
 
-(* QUESTION 3. Ternary Expressions and More Method Calls *)
-(* 3(a). Extend this class heirarchy by writing a "cond_exp" class to
-   represent conditionals of the form
+type 'a tree =
+  | Leaf of 'a
+  | Nd of 'a tree * 'a tree
 
-   e ::= ... | e?e:e
+let _ =
+  let tree1 = Nd (Leaf 1,Leaf 2) in
+  let rec closest (x:int) (t:int tree) =
+    match t with
+    | Leaf y -> y
+    | Nd (y,z) ->
+       let lf = closest x y in
+       let rt = closest x z in
+       if abs (x-lf) < abs (x-rt) then lf else rt
+  in closest 1 tree1
 
-   In a conditional expression a?b:c, evaluate "a" and if the value is
-   not 0, then return the value of "b".  If the value of "a" is 0,
-   then return the value of "c".
+exception Found of int
+let _ =
+  let tree1 = Nd (Leaf 1,Leaf 2) in
+  let rec closest (x:int) (t:int tree) =
+    match t with
+    | Leaf y -> if x=y then raise (Found x) else y
+    | Nd (y,z) ->
+       let lf = closest x y in
+       let rt = closest x z in
+       if abs (x-lf) < abs (x-rt) then lf else rt
+  in try closest 1 tree1 with | Found n -> n
 
-   Again, try to make as few changes as possible to the program.  If
-   necessary, redesign the class hierarchy you created for Question 2
-   so that it handles both unary and ternary expressions.
- *)
 
-(* 3(b). Re-create all the objects a,b,c,d,e above and create new
-   objects:
-   - An expression "f" representing the square of "c"
-   - An expression "g" representing the conditional b?e:f
-   Then send the message "value" to "g".
- *)
+(* QUESTION 3. Continuations et exceptions *)
+(* Considérez les fonctions OCaml suivantes, qui utilisent une
+   continuation pour le calcul normal et une continuation pour le
+   calcul d'erreur. Écrivez une nouvelle version de cette fonction qui
+   fait le même calcul qui n'utilise aucune continuation et qui
+   utilise une exception au lieu d'une continuation pour la condition
+   d'erreur. *)
 
-(* 3(c) Enter the following expressions (for a,b,c,d,e,f,g) into OCaml
-   so that you can see what is printed by the OCaml interpreter.  In
-   each case, the type of the expression will be printed. Note that
-   they are not all the same.
-
-   Then enter the expression defining the value of "e_list".  Note
-   that this is a list containing elements of type "expression", which
-   is a different type than the ones printed out for a,b,c,d,e,f,g.
-   Explain why these elements are all allowed to have more than one
-   type in OCaml.
-
-   To answer 3(c), uncomment this code and execute it.
-
-let _ = a
-let _ = b
-let _ = c
-let _ = d
-let _ = e
-let _ = f
-let _ = g
-let e_list : expression list = [a;b;c;d;e;f;g]
- *)
-
-(* QUESTION 4. Redesign the entire hierarchy again, so that it
-   includes a new operation that takes one argument (x:int) and
-   modifies an expression object so that all of its leaves are
-   incremented by the value of x.  (The leaves of an expression are
-   all the subexpressions belonging to the "number_exp" class.)  This
-   operation should not return a new instance of an "expression".  It
-   should modify the instances that it is applied to.
-
-   Re-create all the objects a,b,c,d,e,f,g again.  Then send the
-   message "value" to "g".  Then apply the new operation with any
-   argument value greater than 0.  Then send the message "value" to
-   "g". The new value should be different than the original one.
-   Verify that your implementation gives the expected new value.  *)
+let f (x:int) (normal_cont:int->int) (exception_cont:unit -> int) =
+  if x < 0
+  then exception_cont()
+  else normal_cont (x/2)
+let g (y:int) = f y (fun z -> 1+z) (fun () -> 0)
