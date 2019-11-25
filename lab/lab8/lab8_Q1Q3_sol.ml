@@ -32,9 +32,36 @@ let rec f1 (x:int) =
 
 (* Indiquez la séquence des étapes pour l’appel de fonction (f1 11). Le
    premier est "appel (f1 11)" et le second est "appel (f1 9)".
-   Donnez la liste du reste des étapes à partir d'ici.
-   (f1 7)...(f1 5) --> 3 -> f1 (3-2) & raise Odd alors Odd->(-5)-> -5 *)
+   Donnez la liste du reste des étapes à partir d'ici. *)
 
+(* Une version contenant des instructions d'impression qui peut vous
+   aider à suivre le processus d'exécution. *)
+let rec f1' (x:int) =
+  match x with
+  | 0 -> (print_string "0"; 1)
+  | 1 -> (print_string "1"; raise Odd)
+  | 3 -> (print_string "3"; f1' (3-2))
+  | _ -> try (print_string "n"; f1' (x-2)) with | Odd -> (-x)
+
+(* Solution:
+appel (f1 11)
+appel (f1 9)
+appel (f1 7)
+appel (f1 5)
+appel (f1 3)
+appel (f1 1)
+levez l'exception Odd
+dépilez l'enregistrement d'activation pour (f1 1)
+  sans retourner contrôle à la fonction
+dépilez l'enregistrement d'activation pour (f1 3)
+  sans retourner contrôle à la fonction
+dans l'enregistrement d'activation pour (f1 5)
+dans in activation record for (f1 5), gérez l'exception Odd
+renvoyez la valeur -5 de l'appel (f1 5)
+renvoyez la valeur -5 de l'appel (f1 7)
+renvoyez la valeur -5 de l'appel (f1 9)
+renvoyez la valeur -5 de l'appel (f1 11)
+ *)
 
 (* QUESTION 2. Exceptions et gestion de la mémoire *)
 (* Les deux versions suivantes de la fonction "closest" prennent un
@@ -85,7 +112,6 @@ let _ =
        if abs (x-lf) < abs (x-rt) then lf else rt
   in try closest 1 tree1 with | Found n -> n
 
-
 (* QUESTION 3. Continuations et exceptions *)
 (* Considérez les fonctions OCaml suivantes, qui utilisent une
    continuation pour le calcul normal et une continuation pour le
@@ -99,3 +125,10 @@ let f (x:int) (normal_cont:int->int) (exception_cont:unit -> int) =
   then exception_cont()
   else normal_cont (x/2)
 let g (y:int) = f y (fun z -> 1+z) (fun () -> 0)
+
+(* Solution: *)
+exception Too_Small
+let f' (x:int) = if x<0
+                 then raise Too_Small
+                 else x/2
+let g' (y:int) = try 1+(f' y) with | Too_Small -> 0
